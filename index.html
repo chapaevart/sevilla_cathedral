@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивная карта - Каталог</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <h1 style="margin:0; font-size: 20px;">Объект:</h1>
+            <select id="map-selector" class="map-select" onchange="switchMap(this.value)"></select>
+        </div>
+        
+        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <label class="edit-toggle">
+                <input type="checkbox" id="edit-mode-toggle">
+                <span>Перетаскивание точек</span>
+            </label>
+            <button id="save-drag-btn" class="btn-success hidden" onclick="exportMapData()">💾 Сохранить</button>
+            <a href="editor.html" class="edit-link">✏️ Редактор (Админка)</a>
+        </div>
+    </header>
+    
+    <div class="map-container" id="map-container">
+        <!-- Внешний враппер для зума и панорамирования -->
+        <div id="map-transform-wrapper">
+            <!-- Внутренний враппер (корсет), который ЖЕСТКО облегает картинку -->
+            <div id="image-bounds">
+                <img id="map-image" src="" alt="Карта" />
+                <div id="points-layer"></div>
+            </div>
+        </div>
+        
+        <div id="popup" class="popup hidden">
+            <button class="close-btn" onclick="closePopup()">×</button>
+            <h2 id="popup-title">Название</h2>
+            <div class="popup-section">
+                <h3>Имена и Семьи:</h3>
+                <div id="popup-buried"></div>
+            </div>
+            <div class="popup-section">
+                <h3>Предметы искусства:</h3>
+                <div id="popup-art"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="mapData.js"></script>
+    <script src="map.js"></script>
+</body>
+</html>

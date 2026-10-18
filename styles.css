@@ -1,0 +1,138 @@
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f0f2f5; }
+header { background: #1e3a8a; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 15px;}
+header h1 { margin: 0; font-size: 22px; }
+
+.map-select { font-size: 16px; font-weight: bold; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 6px 12px; outline: none; cursor: pointer; max-width: 300px;}
+.map-select option { color: #333; background: #fff; }
+
+.edit-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; color: white; font-size: 14px; font-weight: normal; background: rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 6px; transition: background 0.2s;}
+.edit-toggle:hover { background: rgba(255,255,255,0.25); }
+.edit-toggle input { cursor: pointer; width: 16px; height: 16px; margin: 0; }
+.btn-success { background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: background 0.2s;}
+.btn-success:hover { background: #059669; }
+.edit-link { color: #1e3a8a; text-decoration: none; font-weight: bold; background: #fbbf24; padding: 8px 15px; border-radius: 6px; transition: background 0.2s; font-size: 14px;}
+.edit-link:hover { background: #f59e0b; }
+.hidden { display: none !important; }
+
+/* Обновленный контейнер карты */
+.map-container { 
+    position: relative; 
+    width: 100%; 
+    max-width: 1200px; 
+    height: 75vh; /* Универсальная высота для телефонов и ПК */
+    min-height: 500px;
+    max-height: 800px;
+    margin: 20px auto; 
+    background: #e5e7eb; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+    overflow: hidden; 
+    border-radius: 8px; 
+    border: 1px solid #ddd; 
+    touch-action: none; /* Блокировка системных жестов */
+}
+
+/* Слой трансформаций, растянутый на 100% окна */
+#map-transform-wrapper {
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+    transform-origin: 0 0; 
+    will-change: transform;
+    display: flex; /* Центрируем контент */
+    align-items: center; 
+    justify-content: center;
+}
+
+/* Корсет, который ужимается строго по размеру картинки */
+#image-bounds {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    max-height: 100%;
+    line-height: 0; /* Убирает лишний пиксельный отступ снизу */
+    box-shadow: 0 0 15px rgba(0,0,0,0.1); /* Легкая тень самой карты */
+}
+
+/* Картинка, задающая физический размер */
+#map-image {
+    display: block; 
+    max-width: 100%; 
+    max-height: 100%; 
+    width: auto; 
+    height: auto; 
+    pointer-events: none; 
+}
+
+/* Слой точек накладывается ровно на корсет #image-bounds */
+#points-layer { 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    pointer-events: none; 
+}
+
+/* Стили точек */
+.map-point { 
+    position: absolute; width: 28px; height: 28px; 
+    background: rgba(220, 38, 38, 0.5); 
+    border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; 
+    transform: translate(-50%, -50%); cursor: pointer; pointer-events: auto; 
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    transition: transform 0.2s, background 0.2s, box-shadow 0.2s, border-color 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    color: #ffffff; font-size: 11px; font-weight: 700;
+    text-shadow: 0px 0px 3px rgba(0,0,0,0.9);
+}
+.map-point:hover { 
+    transform: translate(-50%, -50%) scale(1.3); 
+    background: rgba(185, 28, 28, 0.85); 
+    border-color: #fef08a;
+    z-index: 10; 
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); 
+}
+
+.map-point.draggable { cursor: grab !important; border-color: #fbbf24; background: rgba(239, 68, 68, 0.7);}
+.map-point.dragging { 
+    cursor: grabbing !important; z-index: 200 !important; 
+    transform: translate(-50%, -50%) scale(1.5); 
+    background: rgba(245, 158, 11, 0.9); border-color: white;
+    box-shadow: 0 15px 25px rgba(0,0,0,0.4);
+    transition: none; 
+}
+
+/* Адаптация для мобильных устройств (экраны уже 768px) */
+@media (max-width: 768px) {
+    .map-point { 
+        width: 20px; /* Уменьшено на ~30% (было 28px) */
+        height: 20px; 
+        font-size: 9px; /* Чуть уменьшаем шрифт, чтобы цифры влезали */
+        border-width: 1.5px; /* Делаем обводку чуть тоньше */
+    }
+    
+    /* Сохраняем правильное масштабирование при касании/нажатии на мобилке */
+    .map-point:active, .map-point:hover {
+        transform: translate(-50%, -50%) scale(1.3);
+    }
+    
+    .map-point.dragging {
+        transform: translate(-50%, -50%) scale(1.5);
+    }
+}
+
+/* Стили попапа */
+.popup { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.3); width: 90%; max-width: 600px; max-height: 85%; overflow-y: auto; z-index: 100; pointer-events: auto; }
+.popup.hidden { display: none; }
+.close-btn { position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 32px; cursor: pointer; color: #9ca3af; line-height: 1; transition: color 0.2s; }
+.close-btn:hover { color: #ef4444; }
+.popup h2 { margin-top: 0; color: #1e3a8a; border-bottom: 2px solid #bfdbfe; padding-bottom: 12px; font-size: 26px; }
+.popup-section { margin-top: 25px; }
+.popup-section h3 { font-size: 16px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; background: #f8fafc; padding: 5px 10px; border-radius: 4px; border-left: 3px solid #3b82f6;}
+.popup-section div { font-size: 15px; color: #334155; line-height: 1.6; padding: 0 10px; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;}
+.popup-section ul { padding-left: 20px; margin: 10px 0; list-style-type: disc; }
+.popup-section ol { padding-left: 20px; margin: 10px 0; list-style-type: decimal; }
+.popup-section li { margin-bottom: 5px; }
+

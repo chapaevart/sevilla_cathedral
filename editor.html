@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор карты Севильского собора</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; margin: 0; height: 100vh; background: #f8fafc; }
+        .sidebar { width: 320px; background: #fff; border-right: 1px solid #e2e8f0; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; box-shadow: 2px 0 5px rgba(0,0,0,0.05); z-index: 10; }
+        .main { flex: 1; padding: 30px; overflow-y: auto; }
+        
+        .point-item { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; border-radius: 6px; margin-bottom: 6px; transition: background 0.2s; font-size: 15px;}
+        .point-item:hover { background: #f1f5f9; }
+        .active { background: #e0f2fe; font-weight: bold; border-left: 4px solid #0ea5e9; color: #0369a1; }
+        
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #475569; font-size: 14px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 14px; outline: none; transition: border 0.2s;}
+        input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
+        
+        /* НОВЫЕ ЖЕСТКИЕ СТИЛИ ДЛЯ РЕДАКТОРА (Для борьбы с Google Docs) */
+        .rich-editor { 
+            width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; 
+            box-sizing: border-box; min-height: 180px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-size: 15px; line-height: 1.6; overflow-y: auto; outline: none; background: #fff; color: #334155;
+            word-wrap: break-word; overflow-wrap: break-word; /* Запрет вылезания текста за края */
+        }
+        .rich-editor:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
+        .rich-editor * { max-width: 100% !important; word-wrap: break-word !important; }
+        .rich-editor ul { padding-left: 25px; margin: 10px 0; list-style-type: disc; }
+        .rich-editor ol { padding-left: 25px; margin: 10px 0; list-style-type: decimal; }
+        .rich-editor li { margin-bottom: 5px; }
+        .rich-editor p { margin: 0 0 10px 0; }
+        
+        button { background: #0ea5e9; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 600; transition: background 0.2s; }
+        button:hover { background: #0284c7; }
+        .btn-success { background: #10b981; font-size: 16px; padding: 12px 25px; box-shadow: 0 4px 6px rgba(16,185,129,0.25); display: flex; align-items: center; gap: 8px; }
+        .btn-success:hover { background: #059669; }
+        .btn-add { background: #f8fafc; color: #0ea5e9; border: 2px dashed #0ea5e9; width: 100%; margin-bottom: 15px; }
+        .btn-add:hover { background: #e0f2fe; }
+        .btn-danger { background: #ef4444; margin-top: 10px;}
+        .btn-danger:hover { background: #dc2626; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 30px; }
+        .top-nav { margin-bottom: 20px; }
+        .top-nav a { color: #64748b; text-decoration: none; font-size: 15px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500;}
+        .top-nav a:hover { color: #0ea5e9; }
+        
+        .coord-picker { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+        .toolbar { display: flex; gap: 6px; margin-bottom: 8px; background: #f1f5f9; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; flex-wrap: wrap; }
+        .toolbar-btn { background: white; border: 1px solid #cbd5e1; color: #475569; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s;}
+        .toolbar-btn:hover { background: #e0f2fe; border-color: #0ea5e9; color: #0369a1; }
+        .toolbar-btn b { font-size: 14px; }
+        
+        .project-block { background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e2e8f0; }
+        .project-block h3 { margin-top: 0; font-size: 15px; color: #475569; margin-bottom: 10px;}
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="top-nav">
+            <a href="index.html">← Вернуться к карте</a>
+        </div>
+        
+        <div class="project-block">
+            <h3>Текущий объект (карта)</h3>
+            <select id="editorMapSelector" onchange="switchEditorMap(this.value)" style="margin-bottom: 10px;"></select>
+            <button class="btn-add" style="padding: 8px; margin-bottom: 15px;" onclick="addNewMap()">+ Создать новый объект</button>
+            
+            <div>
+                <label style="font-size: 12px;">Название объекта:</label>
+                <input type="text" id="mapNameInput" oninput="saveMapSettings()" style="padding: 6px; margin-bottom: 8px;">
+                <label style="font-size: 12px;">Файл картинки фона:</label>
+                <input type="text" id="mapImageInput" oninput="saveMapSettings()" style="padding: 6px;" placeholder="напр. plan.jpg">
+                <button class="btn-danger" style="width: 100%; padding: 6px; font-size: 12px; margin-top: 10px;" onclick="deleteCurrentMap()">Удалить этот объект</button>
+            </div>
+        </div>
+
+        <h3 style="margin-top:0; color: #1e293b; font-size: 18px;">Точки интереса</h3>
+        <button class="btn-add" onclick="addNewPoint()">+ Добавить точку</button>
+        <div id="pointsList" style="flex:1; overflow-y:auto; padding-right: 5px;"></div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <h2 style="margin: 0; color: #1e293b;">Редактирование: <span id="currentIdTitle" style="color:#0ea5e9">Выберите точку</span></h2>
+            <button class="btn-success" onclick="exportData()">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                Сохранить (Скачать mapData.js)
+            </button>
+        </div>
+
+        <div id="editorForm" style="display: none; max-width: 900px;">
+            <div style="display: flex; gap: 20px; margin-bottom: 5px;">
+                <div class="form-group" style="flex: 1; margin:0;">
+                    <label>ID (код/номер)</label>
+                    <input type="text" id="inputId" oninput="saveCurrentPoint()" placeholder="Например: 062">
+                </div>
+                <div class="form-group" style="flex: 3; margin:0;">
+                    <label>Название точки (капеллы)</label>
+                    <input type="text" id="inputName" oninput="saveCurrentPoint()" placeholder="Capilla de Scalas">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 25px 0;">
+                <div class="form-group" style="flex: 1; margin:0;">
+                    <label>X (Слева направо)</label>
+                    <input type="number" id="inputX" oninput="saveCurrentPoint()" step="0.1" min="0" max="100">
+                    <div class="coord-picker">От 0% (левый край) до 100% (правый край)</div>
+                </div>
+                <div class="form-group" style="flex: 1; margin:0;">
+                    <label>Y (Сверху вниз)</label>
+                    <input type="number" id="inputY" oninput="saveCurrentPoint()" step="0.1" min="0" max="100">
+                    <div class="coord-picker">От 0% (верхний край) до 100% (нижний край)</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Имена и Семьи (Вставляйте прямо из Google Docs!)</label>
+                <div class="toolbar">
+                    <button type="button" class="toolbar-btn" onmousedown="event.preventDefault();" onclick="formatText('bold')"><b>Ж</b> Жирный</button>
+                    <button type="button" class="toolbar-btn" onmousedown="event.preventDefault();" onclick="formatText('insertUnorderedList')">• Маркированный список</button>
+                    <button type="button" class="toolbar-btn" onmousedown="event.preventDefault();" onclick="formatText('insertOrderedList')">1. Нумерованный список</button>
+                </div>
+                <div id="inputBuried" class="rich-editor" contenteditable="true" oninput="saveCurrentPoint()"></div>
+            </div>
+            
+            <div class="form-group">
+                <label>Предметы искусства</label>
+                <div class="toolbar">
+                    <button type="button" class="toolbar-btn" onmousedown="event.preventDefault();" onclick="formatText('bold')"><b>Ж</b> Жирный</button>
+                    <button type="button" class="toolbar-btn" onmousedown="event.preventDefault();" onclick="formatText('insertUnorderedList')">• Маркированный список</button>
+                    <button type="button" class="toolbar-btn" onmousedown="event.preventDefault();" onclick="formatText('insertOrderedList')">1. Нумерованный список</button>
+                </div>
+                <div id="inputArt" class="rich-editor" contenteditable="true" oninput="saveCurrentPoint()"></div>
+            </div>
+            
+            <div style="margin-top: 40px; border-top: 1px dashed #cbd5e1; padding-top: 20px; text-align: right;">
+                <button class="btn-danger" onclick="deleteCurrentPoint()">🗑️ Удалить эту точку</button>
+            </div>
+        </div>
+        
+        <div id="welcomeMessage" style="text-align:center; padding: 100px 20px; color: #64748b;">
+            <svg width="64" height="64" fill="none" stroke="#cbd5e1" viewBox="0 0 24 24" style="margin-bottom: 20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+            <h2 style="color: #475569;">Выберите точку в меню слева</h2>
+            <p style="font-size: 16px; line-height: 1.6; max-width: 500px; margin: 0 auto;">
+                Вы можете использовать панель инструментов для визуального форматирования текста. Все изменения сохраняются автоматически.<br><br>
+                По завершении работы нажмите зеленую кнопку <strong>«Сохранить»</strong> в правом верхнем углу.
+            </p>
+        </div>
+    </div>
+
+    <script src="mapData.js"></script>
+    
+    <script>
+        let appProjects = typeof mapData !== 'undefined' ? [...mapData] : [];
+        let currentMapIndex = 0;
+        let currentPointIndex = null;
+
+        if(appProjects.length === 0) {
+            addNewMap(); 
+        } else {
+            renderMapSelector();
+            switchEditorMap(0);
+        }
+
+        // --- УПРАВЛЕНИЕ ОБЪЕКТАМИ (КАРТАМИ) ---
+        function renderMapSelector() {
+            const selector = document.getElementById('editorMapSelector');
+            selector.innerHTML = '';
+            appProjects.forEach((map, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.textContent = map.name || `Объект ${index + 1}`;
+                if (index === currentMapIndex) opt.selected = true;
+                selector.appendChild(opt);
+            });
+        }
+
+        function switchEditorMap(index) {
+            currentMapIndex = parseInt(index);
+            currentPointIndex = null;
+            
+            const mapInfo = appProjects[currentMapIndex];
+            document.getElementById('mapNameInput').value = mapInfo.name || '';
+            document.getElementById('mapImageInput').value = mapInfo.image || '';
+            
+            document.getElementById('editorForm').style.display = 'none';
+            document.getElementById('welcomeMessage').style.display = 'block';
+            
+            renderPointsList();
+        }
+
+        function saveMapSettings() {
+            appProjects[currentMapIndex].name = document.getElementById('mapNameInput').value;
+            appProjects[currentMapIndex].image = document.getElementById('mapImageInput').value;
+            renderMapSelector();
+        }
+
+        function addNewMap() {
+            appProjects.push({
+                id: 'new_map_' + Date.now(),
+                name: 'Новый объект',
+                image: 'new_plan.jpg',
+                points: []
+            });
+            renderMapSelector();
+            switchEditorMap(appProjects.length - 1);
+        }
+
+        function deleteCurrentMap() {
+            if(appProjects.length <= 1) {
+                alert("Нельзя удалить единственный объект!");
+                return;
+            }
+            if(confirm(`Удалить объект "${appProjects[currentMapIndex].name}" и ВСЕ его точки?`)) {
+                appProjects.splice(currentMapIndex, 1);
+                renderMapSelector();
+                switchEditorMap(0);
+            }
+        }
+
+        // --- УПРАВЛЕНИЕ ТОЧКАМИ ---
+        function renderPointsList() {
+            const listDiv = document.getElementById('pointsList');
+            listDiv.innerHTML = '';
+            
+            const currentPoints = appProjects[currentMapIndex].points || [];
+            
+            currentPoints.forEach((point, index) => {
+                const div = document.createElement('div');
+                div.className = `point-item ${currentPointIndex === index ? 'active' : ''}`;
+                div.innerHTML = `<strong>${point.id || '?'}</strong> - ${point.name || 'Без названия'}`;
+                div.onclick = () => loadPoint(index);
+                listDiv.appendChild(div);
+            });
+        }
+
+        function loadPoint(index) {
+            currentPointIndex = index;
+            const point = appProjects[currentMapIndex].points[index];
+            
+            document.getElementById('editorForm').style.display = 'block';
+            document.getElementById('welcomeMessage').style.display = 'none';
+            document.getElementById('currentIdTitle').textContent = point.name || 'Новая точка';
+            
+            document.getElementById('inputId').value = point.id || '';
+            document.getElementById('inputName').value = point.name || '';
+            document.getElementById('inputX').value = point.x || 0;
+            document.getElementById('inputY').value = point.y || 0;
+            
+            document.getElementById('inputBuried').innerHTML = point.buried || '';
+            document.getElementById('inputArt').innerHTML = point.art || '';
+            
+            renderPointsList();
+        }
+
+        function saveCurrentPoint() {
+            if (currentPointIndex === null) return;
+            
+            appProjects[currentMapIndex].points[currentPointIndex] = {
+                id: document.getElementById('inputId').value,
+                name: document.getElementById('inputName').value,
+                x: parseFloat(document.getElementById('inputX').value) || 0,
+                y: parseFloat(document.getElementById('inputY').value) || 0,
+                buried: document.getElementById('inputBuried').innerHTML,
+                art: document.getElementById('inputArt').innerHTML
+            };
+            
+            document.getElementById('currentIdTitle').textContent = appProjects[currentMapIndex].points[currentPointIndex].name || 'Без названия';
+            renderPointsList();
+        }
+
+        function addNewPoint() {
+            if(!appProjects[currentMapIndex].points) appProjects[currentMapIndex].points = [];
+            
+            appProjects[currentMapIndex].points.push({ id: '', name: 'Новая точка', x: 50, y: 50, buried: '', art: '' });
+            loadPoint(appProjects[currentMapIndex].points.length - 1);
+        }
+        
+        function deleteCurrentPoint() {
+            if (currentPointIndex === null) return;
+            if(confirm('Удалить эту точку?')) {
+                appProjects[currentMapIndex].points.splice(currentPointIndex, 1);
+                currentPointIndex = null;
+                document.getElementById('editorForm').style.display = 'none';
+                document.getElementById('welcomeMessage').style.display = 'block';
+                renderPointsList();
+            }
+        }
+
+        function formatText(command) {
+            document.execCommand(command, false, null);
+            saveCurrentPoint();
+        }
+
+        // --- УМНАЯ ОЧИСТКА ВСТАВКИ ИЗ GOOGLE DOCS ---
+        document.querySelectorAll('.rich-editor').forEach(editor => {
+            editor.addEventListener('paste', function(e) {
+                e.preventDefault();
+                
+                const html = (e.clipboardData || window.clipboardData).getData('text/html');
+                const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+
+                if (html) {
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+
+                    // 1. Удаляем полностью мусорные теги (включая картинки из гугл доков)
+                    temp.querySelectorAll('meta, style, script, link, img').forEach(el => el.remove());
+
+                    // 2. Распознаем жирный текст и курсив, спрятанные в span-ах (Как делает Google Docs)
+                    const formatNodes = Array.from(temp.querySelectorAll('span, b, strong, i, em'));
+                    for (let el of formatNodes) {
+                        if (!el.parentNode) continue;
+                        
+                        let isBold = el.style.fontWeight === 'bold' || el.style.fontWeight === '700' || parseInt(el.style.fontWeight) >= 600 || el.tagName === 'B' || el.tagName === 'STRONG';
+                        let isItalic = el.style.fontStyle === 'italic' || el.tagName === 'I' || el.tagName === 'EM';
+                        
+                        let replacement = el;
+                        if (isBold) {
+                            const b = document.createElement('strong');
+                            b.innerHTML = replacement.innerHTML;
+                            replacement = b;
+                        }
+                        if (isItalic) {
+                            const i = document.createElement('em');
+                            i.innerHTML = replacement.innerHTML;
+                            replacement = i;
+                        }
+                        
+                        if (replacement !== el) {
+                            el.parentNode.replaceChild(replacement, el);
+                        }
+                    }
+
+                    // 3. Жестко удаляем ВСЕ атрибуты со ВСЕХ тегов (цвет фона, цвет текста, размеры, классы)
+                    temp.querySelectorAll('*').forEach(el => {
+                        while (el.attributes.length > 0) {
+                            el.removeAttribute(el.attributes[0].name);
+                        }
+                    });
+
+                    // Вставляем очищенный и правильный HTML в редактор
+                    document.execCommand('insertHTML', false, temp.innerHTML);
+                } else if (text) {
+                    // Если это просто текст без форматирования (из блокнота)
+                    document.execCommand('insertText', false, text);
+                }
+                
+                saveCurrentPoint();
+            });
+        });
+
+        // --- ЭКСПОРТ ---
+        function exportData() {
+            const jsCode = `const mapData = ${JSON.stringify(appProjects, null, 4)};`;
+            const blob = new Blob([jsCode], { type: 'text/javascript;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'mapData.js';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            
+            alert("✅ Файл mapData.js успешно скачан! \n\nЗамените старый файл в папке с проектом, чтобы изменения применились.");
+        }
+    </script>
+</body>
+</html>
